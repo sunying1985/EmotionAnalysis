@@ -17,26 +17,26 @@ public class ReadConfigUtil {
 	static {
 		InputStream in = null;
 		try {
-			File config_file_path = new File("dm_entity.properties");
+			File config_file_path = new File("dm_emotional.properties");
 			if (config_file_path.exists()) {
 				in = new FileInputStream(config_file_path);
 			} else {
 				in = ReadConfigUtil.class.getClassLoader().getResourceAsStream(
-						"dm_entity.properties");
+						"dm_emotional.properties");
 			}
 		} catch (FileNotFoundException e1) {
-			System.out.println("config file not found dm_entity.properties!");
+			System.out.println("config file not found dm_emotional.properties!");
 		}
 		config = new Properties();
 		try {
 			if(in==null){
-				System.out.println("config file not found dm_entity.properties!");
+				System.out.println("config file not found dm_emotional.properties!");
 			}else {
 				config.load(in);
 				in.close();				
 			}
 		} catch (IOException e) {
-			System.out.println("No dm_entity.properties defined error");
+			System.out.println("No dm_emotional.properties defined error");
 		}
 	}
 
