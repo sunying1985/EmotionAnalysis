@@ -14,47 +14,37 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
 
-import com.suny.ambiguous.ExternalDictionary;
-import com.suny.ambiguous.ItemContextInform;
-import com.suny.ambiguous.ItemContextStatistics;
-import com.suny.ambiguous.TextTradTransSimple;
-import com.suny.ambiguous.WordLoad;
-import com.suny.mmseg.main.ComplexSeg;
-import com.suny.mmseg.main.Dictionary;
-import com.suny.mmseg.main.MMSeg;
-import com.suny.mmseg.main.Seg;
-import com.suny.mmseg.main.Word;
 import com.suny.sort.InvertedItemValue;
+import com.suny.entity.text.trans.TextTradTransSimple;
+import com.suny.mmseg.interfa.MMsegInterface;
 
 public class TextAnalysis {
 
 	/**
 	* error logger information
 	 */
-	private static final Logger logInfo = Logger.getLogger(ItemContextStatistics.class.getName());
+	private static final Logger logInfo = Logger.getLogger(TextAnalysis.class.getName());
 	
 	/**
 	 * segment handle
 	 */
-	private  Seg segHandle = null;
-	// 即将进行统计的词语
-	public  WordLoad wordsDict = null;
+	private  MMsegInterface segHandle = null;
+
 	// 附加词典加载句柄
-	private ExternalDictionary   exterDictHandle = null;
+	private VocabluaryHandle   exterDictHandle = null;
 	// 繁简体转化句柄词典
 	private TextTradTransSimple textTransHandle = null;
-	/**
-	 * 保存统计结果的内容
-	 * key   key1keykey2:freq;key_ikeykey_j:freq
-	 */
-	private  Map<String,ItemContextInform> statisResult = null;
 	
-	/**
-	 *  保存没有歧义的上下文环境
-	 */
-	private Set<String>  noAmbiguousContext = null;
+
+    // 单个词语命中得频率
+	private ItemFreq posiSimpRulesFreq = null;
+	private ItemFreq negaSimpRulesFreq = null;
 	
-	public ItemContextStatistics() {
+	// 符合组合命中频率
+	private ItemFreq posiCombRulesFreq = null;
+	private ItemFreq negaCombRulesFreq = null;
+	
+	public TextAnalysis() {
 		this.init();
 	}
 	/**
@@ -63,63 +53,21 @@ public class TextAnalysis {
 	private void init() {
 		
 		// segment dictionary file name
-		Dictionary dic = Dictionary.getInstance();
+		this.segHandle = new MMsegInterface(); 
 		
-		// Forward maximum matching
-		//this.segHandle = new SimpleSeg(dic);
-		this.segHandle = new ComplexSeg(dic); 
-		
-		/** 
-		 * load statistics words resource
-		*/
-		this.wordsDict = new WordLoad();
-		
-		this.exterDictHandle = new ExternalDictionary();
+		this.exterDictHandle = new VocabluaryHandle();
 		this.exterDictHandle.initdict();
 		// suny 20141128
 		this.textTransHandle = new TextTradTransSimple();
-		this.textTransHandle.initDictExternal(this.exterDictHandle.tradSimpDict);
+		this.textTransHandle.initDictionary(this.exterDictHandle.tradSimpDict);
 		
-		// 结果保存 20150109 Frank Adolf suny
-		this.statisResult = new HashMap<String,ItemContextInform>();
-		
-		// 20150204 Frank Adolf
-		this.noAmbiguousContext = new HashSet<String>();
-	}
-	
-	/**
-	 * only store the word ends position
-	 * @param  text   the input string
-	 * @return the    segment tag pos array
-	 */
-	public int [] textWordSegLable(String text) {
-		if (text.isEmpty()) {
-			return null;
-		}
-		
-		int [] segLable = new int[text.length()];
-		for (int i = 0; i < text.length(); i++) {
-			segLable[i] = 0;
-		}
-		
-		MMSeg mmSeg = new MMSeg(new StringReader(text), this.segHandle);
-		Word word = null;
-		int tag = 0;
-		
-		try {
-			while((word = mmSeg.next()) != null) {
-				/*System.out.print(word.getString()+" -> "+word.getStartOffset());
-				//offset += word.length;
-				System.out.println(", "+word.getEndOffset()+", "+word.getType());
-				*/
-				segLable[tag] = word.getEndOffset();
-				tag++;
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		
-		return segLable;
+		// the simple rules 
+        this.posiSimpRulesFreq = new ItemFreq();
+        this.negaSimpRulesFreq = new ItemFreq();
+        
+        // the combination reles
+        this.posiCombRulesFreq = new ItemFreq();
+        this.negaCombRulesFreq = new ItemFreq();
 	}
 	
 	/**
@@ -205,8 +153,11 @@ public class TextAnalysis {
 		}
 		return false;
 	}
-	// 判断一个字符串由：全英文字符/数字组成
-	// 去除这样的影响：BAC	BAC Mono
+	/** 判断一个字符串由：全英文字符/数字组成
+	 * 去除这样的影响：BAC	BAC Mono
+	 * @param item
+	 * @return
+	 */
 	public boolean isEngCharNumber(String item) {
 		if (item.isEmpty() == true) {
 			return false;
@@ -235,8 +186,116 @@ public class TextAnalysis {
 		
 		return false;
 	}
+	
 	/**
-	 * loading file
+	 * judge one word is positive 
+	 * @param word  the input word to judge
+	 * @return
+	 */
+	private boolean isPositiveWord(String word) {
+		if (word.isEmpty() == true) {
+			return false;
+		}
+		if (this.exterDictHandle.posiWordDict.contains(word) == true) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	
+	/**
+	 * judge one word is negative 
+	 * @param word  the input word to judge
+	 * @return
+	 */
+	private boolean isNegativeWord(String word) {
+		if (word.isEmpty() == true) {
+			return false;
+		}
+		if (this.exterDictHandle.negaWordDict.contains(word) == true) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	
+	/**
+	 * judge one word is level words
+	 * @param word  the input word to judge
+	 * @return
+	 */
+	private boolean isLevelDegreeWord(String word) {
+		if (word.isEmpty() == true) {
+			return false;
+		}
+		if (this.exterDictHandle.rulesWordDict.superLevel.contains(word) == true ||
+			this.exterDictHandle.rulesWordDict.extremelyLevel.contains(word) == true ||
+			this.exterDictHandle.rulesWordDict.veryLevel.contains(word) == true ||
+			this.exterDictHandle.rulesWordDict.fairlyLevel.contains(word) == true ||
+			this.exterDictHandle.rulesWordDict.slightlyLevel.contains(word) == true ||
+			this.exterDictHandle.rulesWordDict.oweLevel.contains(word) == true)  {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	
+	/**
+	 * judge word is deny words
+	 * @param word  the input word to judge
+	 * @return
+	 */
+	private boolean isDenyWord(String word) {
+		if (word.isEmpty() == true) {
+			return false;
+		}
+		if (this.exterDictHandle.rulesWordDict.denyWords.contains(word) == true)  {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	
+	/**
+	 * judge word is double deny words
+	 * @param word  the input word to judge
+	 * @return
+	 */
+	private boolean isDoubleDenyWord(String word) {
+		if (word.isEmpty() == true) {
+			return false;
+		}
+		if (this.exterDictHandle.rulesWordDict.doubleDenyWords.contains(word) == true)  {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	
+	/**
+	 * judge word is double deny words
+	 * @param word  the input word to judge
+	 * @return
+	 */
+	private boolean isPerceptionWord(String word) {
+		if (word.isEmpty() == true) {
+			return false;
+		}
+		if (this.exterDictHandle.rulesWordDict.perceptionWords.contains(word) == true)  {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	
+	/**
+	 * loading file, only for test
 	 */
     public String  loadingDict(String infile) {
 		
@@ -264,11 +323,11 @@ public class TextAnalysis {
 		return allContext;
 	}
 	/**
-	 * statistics words informations from text
+	 * statistics words rules from text
 	 * @param  text  the input string
 	 * @return 
 	 */
-	public boolean getWordsContextInform(String title,String content) {
+	public boolean getHitRulesFreq(String title,String content) {
 		
 		String text = title + content;
 		if (text.isEmpty() == true) {
@@ -280,230 +339,164 @@ public class TextAnalysis {
 		// Frank Adolf suny 20150202 add
 		text = this.textTransHandle.transformText(text);
 		
-		segTag = this.textWordSegLable(text);
+		segTag = this.segHandle.textWordSegLable(text);
 		
 		if (segTag == null) {
 			return false;
 		}
         String headWord = "";
         String currentWord = "";
+        int wordNumber = 0;
         
 		for (int index = 0; index < textSize; index++) {
 			if (segTag[index] == 0) {
 				break;
 			}
+			wordNumber++;
 			if (index == 0) {
 				
 				String tempBuf = text.substring(0, segTag[index]);
 				if (false == this.isEngCharNumber(tempBuf) && false == this.isSpecialWords(tempBuf)) {
-					headWord = tempBuf;
+					if (this.isPositiveWord(tempBuf) == true) {
+						
+						this.posiSimpRulesFreq.addItemsAndFreq(tempBuf, 1);
+						
+					}
+					else if (this.isNegativeWord(tempBuf) == true) {
+						
+						this.negaSimpRulesFreq.addItemsAndFreq(tempBuf, 1);
+					}
+					else {
+						/*if (this.isFamilyName(tempBuf) == false && 
+							true == this.isEngCharNumber(tempBuf) == false) {
+							headWord = tempBuf;
+						}
+						else {
+							headWord = "";
+						}
+						*/
+						headWord = tempBuf;
+					}
 				}
 			}
 			else 
 			{
 				// 中间词语必须再词典中,目前考虑,确保有后文
-				if (index == 1) {
-					 if (segTag[index] != 0 && segTag[index + 1] != 0 ) {
-		               		
-	               		currentWord = text.substring(segTag[index -1], segTag[index]);
-	               		if (true == this.isEngCharNumber(currentWord) || 
-	               			true == this.isSpecialWords(currentWord)) {
-	               			headWord = "";
-	               			currentWord = "";
-	               		}
-	               		else {
-	               			if (true == this.isInWordsDict(currentWord) && headWord.isEmpty() == false) {
-
-	                			// have head and tail words
-                				String lastWord = text.substring(segTag[index], segTag[index + 1]);
-                				if ( true == this.isEngCharNumber(lastWord) ||
-                					 true == this.isSpecialWords(lastWord)) {
-                					
-                					headWord = currentWord;
-                					currentWord = "";
-                				}
-                				else {
-                					String context = headWord + currentWord + lastWord;
-                					this.overlapAmbiguous(currentWord, context);
-                    				
-                    				headWord = currentWord;
-                    				currentWord = "";
-                				}
-		   					}
-	               			else {
-	               				// there is not juage the words
-			               		headWord = currentWord;
-			               		currentWord = "";
-	               			}
-	               		}	
-		            }
-					else {
-						break;
-					}
-				}
-				else {
-					if (segTag[index] != 0 && segTag[index + 1] != 0) {
-						// head and current all before words
-						if (headWord.isEmpty() == true) {
-							if (currentWord.isEmpty() == false) {
-								headWord = currentWord;
-								currentWord = text.substring(segTag[index - 1], segTag[index]);
-							}
-							else {
-								headWord = text.substring(segTag[index - 1], segTag[index]);
-							}
+				if (segTag[index] != 0) {
+					// head and current all before words
+					if (headWord.isEmpty() == true) {
+						currentWord = text.substring(segTag[index - 1], segTag[index]);
+						
+						if (this.isPositiveWord(currentWord) == true) {
+							
+							this.posiSimpRulesFreq.addItemsAndFreq(currentWord, 1);
+						}
+						else if (this.isNegativeWord(currentWord) == true) {
+							
+							this.negaSimpRulesFreq.addItemsAndFreq(currentWord, 1);
 						}
 						else {
-
-							currentWord = text.substring(segTag[index - 1], segTag[index]);
-						
-							if (true == this.isEngCharNumber(headWord) ||
-								true == headWord.isEmpty() ||
-								true == this.isSpecialWords(headWord)) {
+							if (this.isFamilyName(currentWord) == false && 
+								this.isEngCharNumber(currentWord) == false) {
 								headWord = currentWord;
 							}
 							else {
-								if (true == this.isInWordsDict(currentWord) && headWord.isEmpty() == false) {
-
-		                			// have head and tail words
-		            				String lastWord = text.substring(segTag[index], segTag[index + 1]);
-		            				if (true == this.isEngCharNumber(lastWord) || 
-		            					true == this.isSpecialWords(lastWord)) {
-		            					currentWord = "";
-		            					headWord = currentWord;
-		            				}
-		            				else {
-		            					String context = headWord + currentWord + lastWord;
-		            					this.overlapAmbiguous(currentWord, context);
-		            					
-			            				headWord = currentWord;
-			            				currentWord = "";
-		            				}
-			   					}
-		               			else {
-		               				headWord = currentWord;
-		               				currentWord = "";
-		               			}
-							}	
+								headWord = "";
+							}
 						}
 					}
-				}
-			}
-		}
-		
-		return true;
-	}
+					else {
 
-	/**
-	 * word in statistics word dictionary
-	 * @param  word   the judge word
-	 * @return true   if word is car brand name
-	 */
-	private boolean isInWordsDict(String word) {
-		if (word.isEmpty()) {
-			return false;	
-		}
-		
-		if (true == this.wordsDict.itemsDict.contains(word)) {
-			return true;
-		}
-		else {
-			return false;
-		}
-	}
-	
-	/**
-	 * @param item         the current word
-	 * @param contextText  the context of the words
-	 */
-	private void overlapAmbiguous(String item, String contextText) {
-		
-		if(item.isEmpty() == true || contextText.isEmpty() == true) {
-			return ;
-		}
-		// not ambiguous in the context
-		if (this.noAmbiguousContext.contains(contextText) == true ) {
-			
-			return ;
-		}
-		else {
-			// 判断是否存在歧义
-			int [] posArray = new int[3];
-			int pos = contextText.indexOf(item);
-			if (pos == -1) {
-				return ;
-			}
-			posArray[0] = pos;
-			posArray[1] = pos + item.length();
-			posArray[2] = contextText.length();
-			boolean haveAmbigus = false;
-			int i = 0;
-			
-			for(int k = 0; k < 2; k++) {
-				
-				while(i < posArray[k]) {
+						currentWord = text.substring(segTag[index - 1], segTag[index]);
 					
-					int j = posArray[k];
-					while(j < posArray[k + 1]) {
-						j++;
-						
-						String candWord = contextText.substring(i,j);
-						if (true == this.isInWordsDict(candWord)) {
+						if (true == this.isEngCharNumber(currentWord) ||
+							true == this.isFamilyName(currentWord)) {
+							headWord = "";
+						}
+						else {
 							
-							if (this.statisResult.containsKey(candWord) == true ) {
-								ItemContextInform itemContext = new ItemContextInform();
-								itemContext = this.statisResult.get(candWord);
-								itemContext.addItemsFreq(contextText, 1);
+							if (this.isPositiveWord(currentWord) == true) {
+								//this.posiSimpRulesFreq.addItemsAndFreq(currentWord, 1);
+								if (this.isDenyWord(headWord) == true) {
+									
+									this.negaCombRulesFreq.addItemsAndFreq(headWord + currentWord, 1);
+								}
+								else if (this.isDoubleDenyWord(headWord) == true) {
+									
+									this.posiCombRulesFreq.addItemsAndFreq(headWord + currentWord, 1);
+								}
+								else if (this.isLevelDegreeWord(headWord) == true) {
+									
+									this.posiCombRulesFreq.addItemsAndFreq(headWord + currentWord,1);
+								}
+								else {
+									
+									this.posiSimpRulesFreq.addItemsAndFreq(currentWord, 1);
+								}
+							}
+							else if (this.isNegativeWord(currentWord) == true) {
+								//this.negaSimpRulesFreq.addItemsAndFreq(currentWord, 1);
+								if (this.isDenyWord(headWord) == true) {
+									
+									this.posiCombRulesFreq.addItemsAndFreq(headWord + currentWord, 1);
+								}
+								else if (this.isDoubleDenyWord(headWord) == true) {
+									
+									this.negaCombRulesFreq.addItemsAndFreq(headWord + currentWord, 1);
+								}
+								else if (this.isLevelDegreeWord(headWord) == true) {
 								
-								this.statisResult.put(candWord, itemContext);
+									this.negaCombRulesFreq.addItemsAndFreq(headWord + currentWord,1);
+								}
+								else {
+									this.negaSimpRulesFreq.addItemsAndFreq(currentWord, 1);
+								}
 							}
 							else {
-								ItemContextInform itemContext = new ItemContextInform();
-								itemContext.addItemsFreq(contextText, 1);
-								this.statisResult.put(candWord, itemContext);
+								/*if (this.isFamilyName(currentWord) == false && 
+									this.isEngCharNumber(currentWord) == false) {
+									headWord = currentWord;
+								}
+								else {
+									headWord = "";
+								}
+								*/
+								headWord = currentWord;
 							}
-							haveAmbigus = true;
 						}
-						//System.out.println(candWord);
 					}
-					i++;	
 				}
-				i = posArray[k];
-			}
-			
-			if (false == haveAmbigus) {
-				this.noAmbiguousContext.add(contextText);
 			}
 		}
+		// only for test
+		//this.outputStatisticsResult("");
+		
+		// 如何进行归一化
+		// 策略：level 从重要程度高的级别到低的级别：6-1
+		// 按着舆情词语的长度进行加权，长度越长代表的语义更大，权重越高
+		System.out.println("the change values:" + this.simpleDValue(wordNumber));
+		return true;
 	}
 	
+	
+	private double simpleDValue(int wordsNumber) {
+		if (wordsNumber < 0) {
+			return 0.0;
+		}
+		
+		double dValue = 0.0;
+		dValue = (double)(this.posiCombRulesFreq.totalNumber + this.posiSimpRulesFreq.totalNumber
+				          - this.negaSimpRulesFreq.totalNumber - this.negaCombRulesFreq.totalNumber);///(double)wordsNumber;
+		
+		return dValue;
+	}
 	/**
 	 * output the result into file
 	 * @param outfile
 	 * @return true if successful
 	 */
 	public  boolean outputStatisticsResult(String outfile) {
-		/*
-		ItemContextStatistics itemSts = new ItemContextStatistics();
-		itemSts.wordsDict.loadingDict("E:\\my_work\\WordsAmbiguousContext\\corpus\\words.txt");
 		
-		DataBaseTestInterface dbi = new DataBaseTestInterface();
-		dbi.init("sunying", "Lkn4Z4og", "jdbc:mysql://10.38.11.79:3306/test?user=sunying&password=Lkn4Z4og&useUnicode=true&characterEncoding=utf-8", "test");
-
-		try {
-			
-			if (dbi.connectionDataBase() == false) {
-				System.out.println("connect database is error!");
-			}
-			//dbi.createTableEntrence("E:\\my_work\\RegionMining\\segtest\\createTable\\tableCreate.txt",dbi);
-			
-			dbi.TableContents("industry_data_copy", ItemContextStatistics);
-			
-			dbi.closeDataBase();
-		} catch ( Exception se) {
-			se.printStackTrace();
-		}
-		*/
 		try {
 			// output the result to file
 			FileOutputStream fos = new FileOutputStream(outfile,false); // clear the initinal content
@@ -512,18 +505,41 @@ public class TextAnalysis {
 			
 			InvertedItemValue iivHandle = new InvertedItemValue();
 			
-			for(String key : this.statisResult.keySet()) {
-				
-				bw.write(key + "\t");
-				
-				Map<String, Integer> sortedDict = new HashMap<String,Integer>();
-				sortedDict = iivHandle.sortMapByIntegerValue(this.statisResult.get(key).itemContextInform);
-				if (sortedDict != null) {
-					for(String headKey : sortedDict.keySet()) {
-						bw.write(headKey + ":" + sortedDict.get(headKey) + ";");
-					}
+			Map<String, Integer> sortedDict = new HashMap<String,Integer>();
+			sortedDict = iivHandle.sortMapByIntegerValue(this.posiSimpRulesFreq.itemFre);
+			bw.write("the simple positive words:" + "\n");
+			if (sortedDict != null) {
+				for(String headKey : sortedDict.keySet()) {
+					bw.write(headKey + ":" + sortedDict.get(headKey) + ";");
 				}
-				
+				bw.write("\n");
+			}
+			
+			
+			sortedDict = iivHandle.sortMapByIntegerValue(this.posiCombRulesFreq.itemFre);
+			bw.write("the combination positive words:" + "\n");
+			if (sortedDict != null) {
+				for(String headKey : sortedDict.keySet()) {
+					bw.write(headKey + ":" + sortedDict.get(headKey) + ";");
+				}
+				bw.write("\n");
+			}
+			
+			sortedDict = iivHandle.sortMapByIntegerValue(this.negaSimpRulesFreq.itemFre);
+			bw.write("the simple negative words:" + "\n");
+			if (sortedDict != null) {
+				for(String headKey : sortedDict.keySet()) {
+					bw.write(headKey + ":" + sortedDict.get(headKey) + ";");
+				}
+				bw.write("\n");
+			}
+			
+			sortedDict = iivHandle.sortMapByIntegerValue(this.negaCombRulesFreq.itemFre);
+			bw.write("the combination negative words:" + "\n");
+			if (sortedDict != null) {
+				for(String headKey : sortedDict.keySet()) {
+					bw.write(headKey + ":" + sortedDict.get(headKey) + ";");
+				}
 				bw.write("\n");
 			}
 			bw.close();
@@ -538,7 +554,12 @@ public class TextAnalysis {
 	
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
-
+		TextAnalysis ta = new TextAnalysis();
+		String title = ta.loadingDict("E:\\my_work\\SentimentAnalysis\\testCorpus\\title.txt");
+		String content = ta.loadingDict("E:\\my_work\\SentimentAnalysis\\testCorpus\\content.txt");
+		
+		ta.getHitRulesFreq(title, content);
+		ta.outputStatisticsResult("E:\\my_work\\SentimentAnalysis\\testCorpus\\output.txt");
 	}
 
 }
