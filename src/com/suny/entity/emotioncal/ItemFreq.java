@@ -20,6 +20,10 @@ public class ItemFreq {
 	public Map<String,Integer> itemFre = null;
 	
 	/**
+	 * the total number of the struct
+	 */
+	public int totalNumber = 0;
+	/**
 	* contstruct
 	**/
 	public ItemFreq() {
@@ -44,10 +48,12 @@ public class ItemFreq {
 			int oldfre = this.itemFre.get(word);
 			oldfre += fre;
 			this.itemFre.put(word, oldfre);
+			
 		}
 		else {
 			this.itemFre.put(word, fre);	
 		}
+		this.totalNumber += fre;
 		return true;
 	}
 	
@@ -73,7 +79,8 @@ public class ItemFreq {
 			}
 			else {
 				this.itemFre.put(tmpItem, 1);
-			}	
+			}
+			this.totalNumber++;
 		}
 		if (this.itemFre.size() == 0) {
 			return false;
@@ -101,6 +108,7 @@ public class ItemFreq {
 			else {
 				this.itemFre.put(itemArray[i], 1);
 			}
+			this.totalNumber++;
 		}
 		if (this.itemFre.size() == 0) {
 			return false;
@@ -115,6 +123,7 @@ public class ItemFreq {
 		
 		Iterator<String> myIter = this.itemFre.keySet().iterator();
 		
+		System.out.println("the Items total Number is:" + this.totalNumber);
 		while (myIter.hasNext()) {
 			
 			String itemKey = myIter.next().toString();
