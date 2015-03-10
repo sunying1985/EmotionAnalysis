@@ -327,12 +327,14 @@ public class TextAnalysis {
 	 * @param  text  the input string
 	 * @return 
 	 */
-	public boolean getHitRulesFreq(String title,String content) {
+	public boolean getHitRulesFreq(String text) {
 		
-		String text = title + content;
 		if (text.isEmpty() == true) {
 			return false;
 		}
+		//String text = title + content;
+		HitRecordLable hitLable = new HitRecordLable(text);
+		//hitLable.initData(text);
 		
 		int textSize = text.length();
 		int [] segTag = null;
@@ -360,11 +362,12 @@ public class TextAnalysis {
 					if (this.isPositiveWord(tempBuf) == true) {
 						
 						this.posiSimpRulesFreq.addItemsAndFreq(tempBuf, 1);
-						
+						hitLable.addIndexAndRules(0, tempBuf);
 					}
 					else if (this.isNegativeWord(tempBuf) == true) {
 						
 						this.negaSimpRulesFreq.addItemsAndFreq(tempBuf, 1);
+						hitLable.addIndexAndRules(0, tempBuf);
 					}
 					else {
 						/*if (this.isFamilyName(tempBuf) == false && 
@@ -390,10 +393,12 @@ public class TextAnalysis {
 						if (this.isPositiveWord(currentWord) == true) {
 							
 							this.posiSimpRulesFreq.addItemsAndFreq(currentWord, 1);
+							hitLable.addIndexAndRules(index - 1, currentWord);
 						}
 						else if (this.isNegativeWord(currentWord) == true) {
 							
 							this.negaSimpRulesFreq.addItemsAndFreq(currentWord, 1);
+							hitLable.addIndexAndRules(index - 1, currentWord);
 						}
 						else {
 							if (this.isFamilyName(currentWord) == false && 
@@ -420,18 +425,22 @@ public class TextAnalysis {
 								if (this.isDenyWord(headWord) == true) {
 									
 									this.negaCombRulesFreq.addItemsAndFreq(headWord + currentWord, 1);
+									hitLable.addIndexAndRules(index - 1, headWord + currentWord);
 								}
 								else if (this.isDoubleDenyWord(headWord) == true) {
 									
 									this.posiCombRulesFreq.addItemsAndFreq(headWord + currentWord, 1);
+									hitLable.addIndexAndRules(index - 1, headWord + currentWord);
 								}
 								else if (this.isLevelDegreeWord(headWord) == true) {
 									
 									this.posiCombRulesFreq.addItemsAndFreq(headWord + currentWord,1);
+									hitLable.addIndexAndRules(index - 1, headWord + currentWord);
 								}
 								else {
 									
 									this.posiSimpRulesFreq.addItemsAndFreq(currentWord, 1);
+									hitLable.addIndexAndRules(index -1, currentWord);
 								}
 							}
 							else if (this.isNegativeWord(currentWord) == true) {
@@ -439,17 +448,21 @@ public class TextAnalysis {
 								if (this.isDenyWord(headWord) == true) {
 									
 									this.posiCombRulesFreq.addItemsAndFreq(headWord + currentWord, 1);
+									hitLable.addIndexAndRules(index - 1, headWord + currentWord);
 								}
 								else if (this.isDoubleDenyWord(headWord) == true) {
 									
 									this.negaCombRulesFreq.addItemsAndFreq(headWord + currentWord, 1);
+									hitLable.addIndexAndRules(index - 1, headWord + currentWord);
 								}
 								else if (this.isLevelDegreeWord(headWord) == true) {
 								
 									this.negaCombRulesFreq.addItemsAndFreq(headWord + currentWord,1);
+									hitLable.addIndexAndRules(index - 1, headWord + currentWord);
 								}
 								else {
 									this.negaSimpRulesFreq.addItemsAndFreq(currentWord, 1);
+									hitLable.addIndexAndRules(index - 1, currentWord);
 								}
 							}
 							else {
@@ -475,6 +488,7 @@ public class TextAnalysis {
 		// 策略：level 从重要程度高的级别到低的级别：6-1
 		// 按着舆情词语的长度进行加权，长度越长代表的语义更大，权重越高
 		System.out.println("the change values:" + this.simpleDValue(wordNumber));
+		hitLable.outputHitResult();
 		return true;
 	}
 	
@@ -558,7 +572,7 @@ public class TextAnalysis {
 		String title = ta.loadingDict("E:\\my_work\\SentimentAnalysis\\testCorpus\\title.txt");
 		String content = ta.loadingDict("E:\\my_work\\SentimentAnalysis\\testCorpus\\content.txt");
 		
-		ta.getHitRulesFreq(title, content);
+		ta.getHitRulesFreq(title + content);
 		ta.outputStatisticsResult("E:\\my_work\\SentimentAnalysis\\testCorpus\\output.txt");
 	}
 
