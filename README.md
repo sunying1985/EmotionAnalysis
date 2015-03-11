@@ -27,8 +27,10 @@
 * 根据规则搜索打分目标，主要有：denyWord+posi_words/nega_words
                                 levelWordB+posi_words/nega_words
 								posi_words/nega_words等
-* 规则长度加权	
-
+* 计算方法
+        混合规则与单一规则，混合规则分数大于单一规则得分
+		规则长度加权，长度越大分数越大	
+        目前没有对文本长度进行加权
 * 根据文章中命中的正负规则重新为文章打分
 							
 =============
