@@ -499,9 +499,76 @@ public class TextAnalysis {
 		}
 		
 		double dValue = 0.0;
-		dValue = (double)(this.posiCombRulesFreq.totalNumber + this.posiSimpRulesFreq.totalNumber
-				          - this.negaSimpRulesFreq.totalNumber - this.negaCombRulesFreq.totalNumber);///(double)wordsNumber;
+		/* 1.simple method
+		dValue = (double)(this.posiSimpRulesFreq.totalNumber + this.posiCombRulesFreq.totalNumber
+				          - this.negaSimpRulesFreq.totalNumber - this.negaCombRulesFreq.totalNumber);//(double)wordsNumber;
 		
+		System.out.println(this.posiSimpRulesFreq.totalNumber);
+		System.out.println(this.posiCombRulesFreq.totalNumber);
+		System.out.println(this.negaSimpRulesFreq.totalNumber);
+		System.out.println(this.negaCombRulesFreq.totalNumber);
+		*/
+		/**
+		 * comb/simp rules and rules length
+		 */
+		InvertedItemValue iivHandle = new InvertedItemValue();
+		
+		Map<String, Integer> sortedDict = new HashMap<String,Integer>();
+		
+		WordsValue wv = new WordsValue();
+		double simPosiValue = 0.0; 
+		if (this.posiSimpRulesFreq.itemFre.size() > 0) {
+			sortedDict = iivHandle.sortMapByIntegerValue(this.posiSimpRulesFreq.itemFre);
+			
+			if (sortedDict != null) {
+				for(String headKey : sortedDict.keySet()) {
+					//bw.write(headKey + ":" + sortedDict.get(headKey) + ";");
+					wv.setItem(headKey);
+					simPosiValue += wv.getValue() * (double)sortedDict.get(headKey);
+				}
+			}
+		}
+		
+		double simNegaValue = 0.0; 
+		if (this.negaSimpRulesFreq.itemFre.size() > 0) {
+			sortedDict = iivHandle.sortMapByIntegerValue(this.negaSimpRulesFreq.itemFre);
+			
+			if (sortedDict != null) {
+				for(String headKey : sortedDict.keySet()) {
+					//bw.write(headKey + ":" + sortedDict.get(headKey) + ";");
+					wv.setItem(headKey);
+					simNegaValue += wv.getValue() * (double)sortedDict.get(headKey);
+				}
+			}
+		}
+		
+		double compPosiValue = 0.0; 
+		if (this.posiCombRulesFreq.itemFre.size() > 0) {
+			sortedDict = iivHandle.sortMapByIntegerValue(this.posiCombRulesFreq.itemFre);
+			
+			if (sortedDict != null) {
+				for(String headKey : sortedDict.keySet()) {
+					//bw.write(headKey + ":" + sortedDict.get(headKey) + ";");
+					wv.setItem(headKey);
+					compPosiValue += wv.getValue() * (double)sortedDict.get(headKey) * 2;
+				}
+			}
+		}
+		
+		double compNegaValue = 0.0; 
+		if (this.negaCombRulesFreq.itemFre.size() > 0) {
+			sortedDict = iivHandle.sortMapByIntegerValue(this.negaCombRulesFreq.itemFre);
+			
+			if (sortedDict != null) {
+				for(String headKey : sortedDict.keySet()) {
+					//bw.write(headKey + ":" + sortedDict.get(headKey) + ";");
+					wv.setItem(headKey);
+					compNegaValue += wv.getValue() * (double)sortedDict.get(headKey) * 2;
+				}
+			}
+		}
+		// compulate the total value
+		dValue = simPosiValue + compPosiValue - simNegaValue - compNegaValue;
 		return dValue;
 	}
 	/**
@@ -572,8 +639,7 @@ public class TextAnalysis {
 		String title = ta.loadingDict("E:\\my_work\\SentimentAnalysis\\testCorpus\\title.txt");
 		String content = ta.loadingDict("E:\\my_work\\SentimentAnalysis\\testCorpus\\content.txt");
 		
-		ta.getHitRulesFreq(title + content);
+		ta.getHitRulesFreq(content + "");
 		ta.outputStatisticsResult("E:\\my_work\\SentimentAnalysis\\testCorpus\\output.txt");
 	}
-
 }
